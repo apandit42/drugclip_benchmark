@@ -8,7 +8,7 @@ save_dir="savedir"
 tmp_save_dir="tmp_save_dir"
 tsb_dir="tsb_dir"
 
-n_gpu=1
+n_gpu=4
 MASTER_PORT=10055
 finetune_mol_model="mol_pre_no_h_220816.pt" # unimol pretrained mol model
 finetune_pocket_model="pocket_pre_220816.pt" # unimol pretrained pocket model
@@ -29,7 +29,7 @@ lr=1e-3
 # NOTE: CUDA_VISIBLE_DEVICES must be set to all GPUs that we will use - start w/ 0
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
-CUDA_VISIBLE_DEVICES="0" python -m torch.distributed.launch --nproc_per_node=$n_gpu \
+CUDA_VISIBLE_DEVICES="0,1,2,3" python -m torch.distributed.launch --nproc_per_node=$n_gpu \
        --master_port=$MASTER_PORT $(which unicore-train) $data_path --user-dir ./unimol \
        --train-subset train --valid-subset valid \
        --num-workers 8 --ddp-backend=c10d \
@@ -48,7 +48,7 @@ CUDA_VISIBLE_DEVICES="0" python -m torch.distributed.launch --nproc_per_node=$n_
        --best-checkpoint-metric valid_bedroc \
        --save-dir $save_dir \
        --tmp-save-dir $tmp_save_dir \
-       --save-interval-updates 5000 \
+       --save-interval-updates 500 \
        --keep-best-checkpoints 10 \
        --keep-last-epochs 5 \
        --maximize-best-checkpoint-metric \
