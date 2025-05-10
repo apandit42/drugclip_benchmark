@@ -1,0 +1,5 @@
+name: ap_dc
+channels:
+dependencies:
+
+prefix: "/mnt/goon/micromamba/envs/ap_dc"
