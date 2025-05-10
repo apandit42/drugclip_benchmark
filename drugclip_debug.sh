@@ -1,6 +1,6 @@
 
 
-data_path="/mnt/goon/benchmark_code/drugclip_data/"
+data_path="data/train_no_test_af/"
 
 
 save_dir="savedir"
@@ -27,8 +27,9 @@ lr=1e-3
 
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
-CUDA_VISIBLE_DEVICES="1" python -m torch.distributed.torchrun --nproc_per_node=$n_gpu --master_port=$MASTER_PORT $(which unicore-train) $data_path --user-dir ./unimol --train-subset train --valid-subset valid \
-       --num-workers 8 --ddp-backend=c10d \
+CUDA_VISIBLE_DEVICES="1" 
+python $(which unicore-train) $data_path --user-dir ./unimol --train-subset train --valid-subset valid \
+       --num-workers 1 --ddp-backend=c10d \
        --task drugclip --loss in_batch_softmax --arch drugclip  \
        --max-pocket-atoms 256 \
        --optimizer adam --adam-betas "(0.9, 0.999)" --adam-eps 1e-8 --clip-norm 1.0 \

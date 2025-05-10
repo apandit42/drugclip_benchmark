@@ -15,7 +15,7 @@ from unicore import checkpoint_utils
 import unicore
 from unicore.data import (AppendTokenDataset, Dictionary, EpochShuffleDataset,
                           FromNumpyDataset, NestedDictionaryDataset,
-                          PrependTokenDataset, RawArrayDataset,LMDBDataset, RawLabelDataset,
+                          PrependTokenDataset, RawArrayDataset,RawLabelDataset,
                           RightPadDataset, RightPadDataset2D, TokenizeDataset,SortDataset,data_utils)
 from unicore.tasks import UnicoreTask, register_task
 from unimol.data import (AffinityDataset, CroppingPocketDataset,
@@ -23,7 +23,7 @@ from unimol.data import (AffinityDataset, CroppingPocketDataset,
                          EdgeTypeDataset, KeyDataset, LengthDataset,
                          NormalizeDataset, NormalizeDockingPoseDataset,
                          PrependAndAppend2DDataset, RemoveHydrogenDataset,
-                         RemoveHydrogenPocketDataset, RightPadDatasetCoord,
+                         RemoveHydrogenPocketDataset, RightPadDatasetCoord,LMDBDataset, 
                          RightPadDatasetCross2D, TTADockingPoseDataset, AffinityTestDataset, AffinityValidDataset, AffinityMolDataset, AffinityPocketDataset, ResamplingDataset)
 #from skchem.metrics import bedroc_score
 from rdkit.ML.Scoring.Scoring import CalcBEDROC, CalcAUC, CalcEnrichment
@@ -154,7 +154,8 @@ class DrugCLIP(UnicoreTask):
             type=Boolean,
             help="whether test model",
         )
-        parser.add_argument("--reg", action="store_true", help="regression task")
+        parser.add_argument("--reg", action="store_true", help="regression task"),
+        parser.add_argument("--lmdb-map-path", default = '/mnt/goon/benchmark_code/drugclip_data/')
 
     def __init__(self, args, dictionary, pocket_dictionary):
         super().__init__(args)
@@ -176,13 +177,16 @@ class DrugCLIP(UnicoreTask):
         return cls(args, mol_dictionary, pocket_dictionary)
 
     def load_dataset(self, split, **kwargs):
+        print(f'loading {split}')
         """Load a given dataset split.
         'smi','pocket','atoms','coordinates','pocket_atoms','pocket_coordinates'
         Args:
             split (str): name of the data scoure (e.g., bppp)
         """
         data_path = os.path.join(self.args.data, split + ".lmdb")
-        dataset = LMDBDataset(data_path)
+        lmdb_map_path  = os.path.join(self.args.lmdb_map_path , split + "_lmdb_map.json") #hardcoded sorry!
+        # print(data_path)
+        dataset = LMDBDataset(data_path, lmdb_map_path)
         if split.startswith("train"):
             smi_dataset = KeyDataset(dataset, "smi")
             poc_dataset = KeyDataset(dataset, "pocket")
@@ -198,7 +202,7 @@ class DrugCLIP(UnicoreTask):
                 True,
             )
             tgt_dataset = KeyDataset(dataset, "affinity")
-            
+            # breakpoint()
         else:
             
             dataset = AffinityDataset(
