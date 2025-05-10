@@ -2,3 +2,5 @@
 *.whl
 data/
 test/
+*.pt
+tsb_dir/
