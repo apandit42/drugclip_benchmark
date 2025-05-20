@@ -15,13 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class LMDBDataset:
-    def __init__(self, db_path, lmdb_map_path):
+    def __init__(self, db_path, lmdb_map_path, moltype):
         self.db_path = db_path
         assert os.path.isfile(self.db_path), "{} not found".format(self.db_path)
         env = self.connect_db(self.db_path)
-        with open(lmdb_map_path, 'r') as file:
+        with open(lmdb_map_path, "r") as file:
             self.lmdb_map = json.load(file)
-        self._keys = self.lmdb_map['lmdb_keys'].keys()
+        self._keys = self.lmdb_map["lmdb_keys"].keys()
+        self.is_train = "train" in lmdb_map_path
+        self.moltype = moltype
 
         # with env.begin() as txn:
         #     self._keys = list(txn.cursor().iternext(values=False))
@@ -48,18 +50,26 @@ class LMDBDataset:
     def __getitem__(self, idx):
         if not hasattr(self, "env"):
             self.connect_db(self.db_path, save_to_self=True)
-        #datapoint_pickled = self.env.begin().get(f"{idx}".encode("ascii"))
-        #print(idx)
-        uniprot_id, ligand_key = self.lmdb_map['lmdb_keys'][str(idx)]
-        prot_key = random.choice(self.lmdb_map['pdb_map'][uniprot_id])
+        # datapoint_pickled = self.env.begin().get(f"{idx}".encode("ascii"))
+        # print(idx)
+        uniprot_id, ligand_key = self.lmdb_map["lmdb_keys"][str(idx)]
+        prot_key = random.choice(self.lmdb_map["pdb_map"][uniprot_id])
         # prot_key = f"{uniprot_id}_{pdb_id}"
         # print(prot_key)
         # breakpoint()
-        datapoint_pickled = self.env.begin().get(prot_key.encode())
-        data_pocket = pickle.loads(datapoint_pickled)
-        datapoint_pickled = self.env.begin().get(ligand_key.encode())
-        data_ligand = pickle.loads(datapoint_pickled)
-        
+        data_pocket = {}
+        data_ligand = {}
+        if self.moltype != "lig":
+            datapoint_pickled = self.env.begin().get(prot_key.encode())
+            data_pocket = pickle.loads(datapoint_pickled)
+        if self.moltype != "pocket":
+            datapoint_pickled = self.env.begin().get(ligand_key.encode())
+            data_ligand = pickle.loads(datapoint_pickled)
+        # super janky, but i think i may have made too many conformations for this step for now
+        if not self.is_train and "coordinates" in data_ligand:
+            data_ligand["coordinates"] = [data_ligand["coordinates"][0]]
+
         data = data_pocket | data_ligand
-        del data['label']
+        # if 'label' in dat a:
+            # del data["label"]
         return data

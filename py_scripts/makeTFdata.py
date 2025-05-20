@@ -30,10 +30,10 @@ import click
 
 
 @click.command()
-@click.option('--moltype', default = 'lig', type=click.Choice(['lig', 'protein']), required=True, help="Type of data: 'lig' or 'protein'")
-@click.option('--train-split', type=int, default=2, show_default=True, help="Fraction of data to use for training split, 1, for val, 2, for test") 
-@click.option('--output-dir', type=str, default='/mnt/goon/benchmark_code/drugclip_data/ligand_data/', show_default=True, help="output dir") 
-@click.option('--data-df-path', type=str, default="/mnt/goon/tf_data/ligand_split.csv", show_default=True, help="output dir") 
+@click.option('--moltype', default = 'protein', type=click.Choice(['lig', 'protein']), required=True, help="Type of data: 'lig' or 'protein'")
+@click.option('--train-split', type=int, default=1, show_default=True, help="Fraction of data to use for training split, 1, for val, 2, for test") 
+@click.option('--output-dir', type=str, default='/mnt/goon/benchmark_code/drugclip_data/target_test_data/', show_default=True, help="output dir") 
+@click.option('--data-df-path', type=str, default="/mnt/goon/tf_data/target_split.csv", show_default=True, help="output dir") 
 def main(moltype, train_split, output_dir, data_df_path):
     df = pd.read_csv(data_df_path)
     if moltype == 'lig':
@@ -41,13 +41,15 @@ def main(moltype, train_split, output_dir, data_df_path):
         df = df.drop_duplicates('smiles').reset_index(drop = True)
     else:
         df = df[df.split==train_split]
-        df = df.drop_duplicates(['uniprot_id', 'pdb_id'])
+        df = df.drop_duplicates(['uniprot_id', 'pdb_id']).reset_index(drop = True)
     if train_split == 0:
         prefix = 'train'
     elif train_split == 1:
         prefix = 'val'
+        df = df.drop_duplicates(['uniprot_id']).reset_index(drop = True)
     else:  
         prefix = 'test'
+        df = df.drop_duplicates(['uniprot_id']).reset_index(drop = True)
     # print
     output_dir= f"{output_dir}/{prefix}/"
     print(f"writing to {output_dir}")
@@ -208,6 +210,7 @@ def mol_parser_csv(smis, ligand_path, label, poolsize= 1):
     # print(len(mols))
     if len(mols)<1:
         print(smis)
+        return{}
     m = mols[0]
 
     return {'atoms': m['atom_types'], 
@@ -249,13 +252,15 @@ def write_lmdb(data, lmdb_path):
     num = 0
     with env.begin(write=True) as txn:
         for d in data:
+            if not 'smi' in d.keys():
+                continue
             txn.put(d['smi'].encode(), pickle.dumps(d))
             num += 1
             
 # Example process function (you said you already have this)
 def process_smiles_chunk(args):
     i, df_batch, output_dir = args
-    lmdb_path = os.path.join(output_dir, f"v2_train_chunk_{i:03d}.lmdb")
+    lmdb_path = os.path.join(output_dir, f"v3_train_chunk_{i:03d}.lmdb")
     data  = [mol_parser_csv([row['smiles']],  None,row["log_value"], 1) for i,row in df_batch.iterrows()]
     write_lmdb(data, lmdb_path)
     # env = lmdb.open(lmdb_path, map_size=1 << 30)  # 1GB
@@ -284,7 +289,7 @@ def process_uniprot_chunk(args):
 
 # Main
 
-def run_batched_lmdb(df, output_dir, batch_size=1000, nprocs=384, moltype = 'lig'):
+def run_batched_lmdb(df, output_dir, batch_size=200, nprocs=384, moltype = 'lig'):
     os.makedirs(output_dir, exist_ok=True)
     batches = [
         (i, df.iloc[i:i + batch_size], output_dir)
